@@ -3,12 +3,12 @@ const std = @import("std");
 pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
-    hello_opencl(b, target, mode);
-    hello_ze(b, target, mode);
+    opencl_rt(b, target, mode);
+    ze_rt(b, target, mode);
 }
 
-fn hello_ze(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode) void {
-    const exe = b.addExecutable("hello_ze", "src/hello_ze.zig");
+fn ze_rt(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode) void {
+    const exe = b.addExecutable("ze_rt", "src/ze_rt.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
 
@@ -24,12 +24,12 @@ fn hello_ze(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builti
         run_cmd.addArgs(args);
     }
 
-    const run_step = b.step("ze", "Run hello_ze");
+    const run_step = b.step("ze", "Run ze_rt");
     run_step.dependOn(&run_cmd.step);
 }
 
-fn hello_opencl(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode) void {
-    const exe = b.addExecutable("hello_opencl", "src/hello_opencl.zig");
+fn opencl_rt(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode) void {
+    const exe = b.addExecutable("opencl_rt", "src/opencl_rt.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
 
@@ -46,6 +46,7 @@ fn hello_opencl(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.bu
         run_cmd.addArgs(args);
     }
 
-    const run_step = b.step("opencl", "Run hello_opencl");
+    const run_step = b.step("opencl", "Run opencl_rt");
+
     run_step.dependOn(&run_cmd.step);
 }

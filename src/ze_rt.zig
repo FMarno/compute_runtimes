@@ -36,6 +36,8 @@ fn print_loader_versions() !void {
     }
 }
 
+// https://github.com/oneapi-src/level-zero/blob/master/samples/zello_world/zello_world.cpp
+
 pub fn main() !void {
     info("Hello!", .{});
     try init_ze();
