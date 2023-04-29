@@ -9,7 +9,7 @@ const info = std.log.info;
 const warn = std.log.warn;
 const zeroes = std.mem.zeroes;
 
-const ZeError = error{ zeInitFailed, zeEventHostSynchronizeFailed, zeCommandListAppendSignalEventFailed, zeContextDestoryFailed, zeEventCreateFailed, zeEventPoolCreateFailed, zeCommandListCreateImmediateFailed, zeDriverGetFailed, zeDeviceGetFailed, zeDeviceGetPropertiesFailed, zeDriverGetPropertiesFailed, zeContextCreateFailed };
+const ZeError = error{ zeInitFailed, zeKernelSetArgumentValueFailed, zeCommandListAppendLaunchKernelFailed, zeKernelSetGroupSizeFailed, zeKernelCreateFailed, zeModuleCreateFailed, zeEventHostSynchronizeFailed, zeCommandListAppendSignalEventFailed, zeContextDestoryFailed, zeEventCreateFailed, zeEventPoolCreateFailed, zeCommandListCreateImmediateFailed, zeDriverGetFailed, zeDeviceGetFailed, zeDeviceGetPropertiesFailed, zeDriverGetPropertiesFailed, zeContextCreateFailed };
 const ZelError = error{zelLoaderGetVersionFailed};
 
 fn print_error(result: c.ze_result_t) void {
@@ -117,6 +117,8 @@ fn findDevice(driver_handle: c.ze_driver_handle_t, device_type: c.ze_device_type
 
 // https://github.com/oneapi-src/level-zero/blob/master/samples/zello_world/zello_world.cpp
 
+const array_size = 1024;
+
 pub fn main() !void {
     info("Hello!", .{});
     try init_ze();
@@ -173,5 +175,31 @@ pub fn main() !void {
         try check(c.zeCommandListAppendSignalEvent(command_list, event), ZeError.zeCommandListAppendSignalEventFailed);
         try check(c.zeEventHostSynchronize(event, std.math.maxInt(u64)), ZeError.zeEventHostSynchronizeFailed);
         info("Congratulations, the device completed execution!", .{});
+
+        const module_il = @embedFile("./kernels/square_array.spv");
+
+        const module_desc = c.ze_module_desc_t{ .stype = c.ZE_STRUCTURE_TYPE_MODULE_DESC, .pNext = null, .format = c.ZE_MODULE_FORMAT_IL_SPIRV, .inputSize = module_il.len, .pInputModule = module_il, .pBuildFlags = null, .pConstants = null };
+        var module: c.ze_module_handle_t = undefined;
+        try check(c.zeModuleCreate(context, device, &module_desc, &module, null), ZeError.zeModuleCreateFailed);
+        defer _ = c.zeModuleDestroy(module);
+
+        var kernel_desc = c.ze_kernel_desc_t{
+            .stype = c.ZE_STRUCTURE_TYPE_KERNEL_DESC,
+            .pNext = null,
+            .flags = 0, // flags
+            .pKernelName = "square_array",
+        };
+        var kernel: c.ze_kernel_handle_t = undefined;
+        try check(c.zeKernelCreate(module, &kernel_desc, &kernel), ZeError.zeKernelCreateFailed);
+        defer _ = c.zeKernelDestroy(kernel);
+
+        try check(c.zeKernelSetGroupSize(kernel, array_size, 1, 1), ZeError.zeKernelSetGroupSizeFailed);
+
+        // https://spec.oneapi.io/level-zero/latest/core/api.html#zememallocdevice
+        // TODO allocate i32 memory
+
+        const launch_args = c.ze_group_count_t{ .groupCountX = 1, .groupCountY = 1, .groupCountZ = 1 };
+        try check(c.zeKernelSetArgumentValue(kernel, 0, @sizeOf(*anyopaque), &src_image), ZeError.zeKernelSetArgumentValueFailed);
+        try check(c.zeKernelSetArgumentValue(kernel, 1, @sizeOf(*anyopaque), &src_image), ZeError.zeKernelSetArgumentValueFailed);
     }
 }
