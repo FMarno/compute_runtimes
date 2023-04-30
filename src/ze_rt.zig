@@ -107,7 +107,7 @@ fn findDevice(driver_handle: c.ze_driver_handle_t, device_type: c.ze_device_type
 
         info("Found device. Name '{s}', Driver version {}.", .{ device_properties.name, driver_properties.driverVersion });
 
-        if (device_properties.type == device_type) {
+        if (found_device == null and device_properties.type == device_type) {
             found_device = device;
         }
     }
@@ -120,7 +120,6 @@ fn findDevice(driver_handle: c.ze_driver_handle_t, device_type: c.ze_device_type
 const array_size = 1024;
 
 pub fn main() !void {
-    info("Hello!", .{});
     try init_ze();
     try print_loader_versions();
 
@@ -230,13 +229,17 @@ pub fn main() !void {
         try check(c.zeCommandListAppendLaunchKernel(command_list, kernel, &launch_args, null, 0, null), ZeError.zeCommandListAppendLaunchKernelFailed);
         try check(c.zeCommandListAppendMemoryCopy(command_list, &host_out, out_ptr, @sizeOf(@TypeOf(host_out)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
 
+        // TODO synchonize with event
+
         for (host_out) |out, idx| {
             if (out != host_in[idx] * host_in[idx]) {
                 info("wrong result at {}: {}", .{ idx, out });
             }
         }
 
-        // This is not running, I'm guessing my driver is old since this is a new function since version 1.6. I should check this.
+        // Inclusion of this function causes a crash with return code 57.
+        // I'm guessing my driver is old since this is a new function since level_zero version 1.6.
+        // TODO check this.
         //try check(c.zeCommandListHostSynchronize(command_list, 0), ZeError.zeCommandListHostSynchronizeFailed);
         info("Congratulations, the device completed execution!", .{});
     }
