@@ -9,7 +9,7 @@ const info = std.log.info;
 const warn = std.log.warn;
 const zeroes = std.mem.zeroes;
 
-const ZeError = error{ zeInitFailed, zeKernelSetArgumentValueFailed, zeCommandListAppendLaunchKernelFailed, zeKernelSetGroupSizeFailed, zeKernelCreateFailed, zeModuleCreateFailed, zeEventHostSynchronizeFailed, zeCommandListAppendSignalEventFailed, zeContextDestoryFailed, zeEventCreateFailed, zeEventPoolCreateFailed, zeCommandListCreateImmediateFailed, zeDriverGetFailed, zeDeviceGetFailed, zeDeviceGetPropertiesFailed, zeDriverGetPropertiesFailed, zeContextCreateFailed };
+const ZeError = error{ zeInitFailed, zeCommandListAppendMemoryCopyFailed, zeKernelSuggestGroupSizeFailed, zeCommandListHostSynchronizeFailed, zeMemAllocDeviceFailed, zeKernelSetArgumentValueFailed, zeCommandListAppendLaunchKernelFailed, zeKernelSetGroupSizeFailed, zeKernelCreateFailed, zeModuleCreateFailed, zeEventHostSynchronizeFailed, zeCommandListAppendSignalEventFailed, zeContextDestoryFailed, zeEventCreateFailed, zeEventPoolCreateFailed, zeCommandListCreateImmediateFailed, zeDriverGetFailed, zeDeviceGetFailed, zeDeviceGetPropertiesFailed, zeDriverGetPropertiesFailed, zeContextCreateFailed };
 const ZelError = error{zelLoaderGetVersionFailed};
 
 fn print_error(result: c.ze_result_t) void {
@@ -147,34 +147,34 @@ pub fn main() !void {
         try check(c.zeCommandListCreateImmediate(context, device, &alt_desc, &command_list), ZeError.zeCommandListCreateImmediateFailed);
         defer _ = c.zeCommandListDestroy(command_list);
 
-        // Create an event to be signaled by the device
-        const ep_desc = c.ze_event_pool_desc_t{
-            .stype = c.ZE_STRUCTURE_TYPE_EVENT_POOL_DESC,
-            .count = 1,
-            .flags = c.ZE_EVENT_POOL_FLAG_HOST_VISIBLE,
-            .pNext = null,
-        };
-        var event_pool: c.ze_event_pool_handle_t = undefined;
+        // // Create an event to be signaled by the device
+        // const ep_desc = c.ze_event_pool_desc_t{
+        //     .stype = c.ZE_STRUCTURE_TYPE_EVENT_POOL_DESC,
+        //     .count = 1,
+        //     .flags = c.ZE_EVENT_POOL_FLAG_HOST_VISIBLE,
+        //     .pNext = null,
+        // };
+        // var event_pool: c.ze_event_pool_handle_t = undefined;
 
-        try check(c.zeEventPoolCreate(context, &ep_desc, 1, &device, &event_pool), ZeError.zeEventPoolCreateFailed);
-        defer _ = c.zeEventPoolDestroy(event_pool);
+        // try check(c.zeEventPoolCreate(context, &ep_desc, 1, &device, &event_pool), ZeError.zeEventPoolCreateFailed);
+        // defer _ = c.zeEventPoolDestroy(event_pool);
 
-        var event: c.ze_event_handle_t = undefined;
-        const ev_desc = c.ze_event_desc_t{
-            .stype = c.ZE_STRUCTURE_TYPE_EVENT_DESC,
-            .signal = c.ZE_EVENT_SCOPE_FLAG_HOST,
-            .wait = c.ZE_EVENT_SCOPE_FLAG_HOST,
-            .pNext = null,
-            .index = 0, // TODO not sure
-        };
+        // var event: c.ze_event_handle_t = undefined;
+        // const ev_desc = c.ze_event_desc_t{
+        //     .stype = c.ZE_STRUCTURE_TYPE_EVENT_DESC,
+        //     .signal = c.ZE_EVENT_SCOPE_FLAG_HOST,
+        //     .wait = c.ZE_EVENT_SCOPE_FLAG_HOST,
+        //     .pNext = null,
+        //     .index = 0, // TODO not sure
+        // };
 
-        try check(c.zeEventCreate(event_pool, &ev_desc, &event), ZeError.zeEventCreateFailed);
-        defer _ = c.zeEventDestroy(event);
+        // try check(c.zeEventCreate(event_pool, &ev_desc, &event), ZeError.zeEventCreateFailed);
+        // defer _ = c.zeEventDestroy(event);
 
-        // signal the event from the device and wait for completion
-        try check(c.zeCommandListAppendSignalEvent(command_list, event), ZeError.zeCommandListAppendSignalEventFailed);
-        try check(c.zeEventHostSynchronize(event, std.math.maxInt(u64)), ZeError.zeEventHostSynchronizeFailed);
-        info("Congratulations, the device completed execution!", .{});
+        // // signal the event from the device and wait for completion
+        // try check(c.zeCommandListAppendSignalEvent(command_list, event), ZeError.zeCommandListAppendSignalEventFailed);
+        // try check(c.zeEventHostSynchronize(event, std.math.maxInt(u64)), ZeError.zeEventHostSynchronizeFailed);
+        // info("Congratulations, the device completed execution!", .{});
 
         const module_il = @embedFile("./kernels/square_array.spv");
 
@@ -193,13 +193,51 @@ pub fn main() !void {
         try check(c.zeKernelCreate(module, &kernel_desc, &kernel), ZeError.zeKernelCreateFailed);
         defer _ = c.zeKernelDestroy(kernel);
 
-        try check(c.zeKernelSetGroupSize(kernel, array_size, 1, 1), ZeError.zeKernelSetGroupSizeFailed);
+        const mem_alloc_desc = c.ze_device_mem_alloc_desc_t{
+            .stype = c.ZE_STRUCTURE_TYPE_DEVICE_MEM_ALLOC_DESC,
+            .pNext = null,
+            .flags = 0, //c.ZE_MEMORY_ACCESS_CAP_FLAG_RW,
+            .ordinal = 0,
+        };
+        var in_ptr: ?*i32 = null;
+        var out_ptr: ?*i32 = null;
+        try check(c.zeMemAllocDevice(context, &mem_alloc_desc, array_size * @sizeOf(i32), @alignOf(i32), device, @ptrCast(*?*anyopaque, &in_ptr)), ZeError.zeMemAllocDeviceFailed);
+        defer _ = c.zeMemFree(context, in_ptr);
+        try check(c.zeMemAllocDevice(context, &mem_alloc_desc, array_size * @sizeOf(i32), @alignOf(i32), device, @ptrCast(*?*anyopaque, &out_ptr)), ZeError.zeMemAllocDeviceFailed);
+        defer _ = c.zeMemFree(context, out_ptr);
 
-        // https://spec.oneapi.io/level-zero/latest/core/api.html#zememallocdevice
-        // TODO allocate i32 memory
+        var host_in: [array_size]i32 = undefined;
+        var host_out = std.mem.zeroes([array_size]i32);
 
-        const launch_args = c.ze_group_count_t{ .groupCountX = 1, .groupCountY = 1, .groupCountZ = 1 };
-        try check(c.zeKernelSetArgumentValue(kernel, 0, @sizeOf(*anyopaque), &src_image), ZeError.zeKernelSetArgumentValueFailed);
-        try check(c.zeKernelSetArgumentValue(kernel, 1, @sizeOf(*anyopaque), &src_image), ZeError.zeKernelSetArgumentValueFailed);
+        for (host_in) |*in, idx| {
+            in.* = @intCast(i32, idx);
+        }
+
+        try check(c.zeCommandListAppendMemoryCopy(command_list, in_ptr, &host_in, @sizeOf(@TypeOf(host_in)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
+
+        try check(c.zeKernelSetArgumentValue(kernel, 0, @sizeOf(*anyopaque), @ptrCast(*const anyopaque, &in_ptr)), ZeError.zeKernelSetArgumentValueFailed);
+        try check(c.zeKernelSetArgumentValue(kernel, 1, @sizeOf(*anyopaque), @ptrCast(*const anyopaque, &out_ptr)), ZeError.zeKernelSetArgumentValueFailed);
+
+        var x: u32 = 0;
+        var y: u32 = 0;
+        var z: u32 = 0;
+        try check(c.zeKernelSuggestGroupSize(kernel, array_size, 1, 1, &x, &y, &z), ZeError.zeKernelSuggestGroupSizeFailed);
+
+        info("suggested group size: x:{} y:{} z:{}", .{ x, y, z });
+
+        try check(c.zeKernelSetGroupSize(kernel, x, y, z), ZeError.zeKernelSetGroupSizeFailed);
+        const launch_args = c.ze_group_count_t{ .groupCountX = array_size, .groupCountY = 1, .groupCountZ = 1 };
+        try check(c.zeCommandListAppendLaunchKernel(command_list, kernel, &launch_args, null, 0, null), ZeError.zeCommandListAppendLaunchKernelFailed);
+        try check(c.zeCommandListAppendMemoryCopy(command_list, &host_out, out_ptr, @sizeOf(@TypeOf(host_out)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
+
+        for (host_out) |out, idx| {
+            if (out != host_in[idx] * host_in[idx]) {
+                info("wrong result at {}: {}", .{ idx, out });
+            }
+        }
+
+        // This is not running, I'm guessing my driver is old since this is a new function since version 1.6. I should check this.
+        //try check(c.zeCommandListHostSynchronize(command_list, 0), ZeError.zeCommandListHostSynchronizeFailed);
+        info("Congratulations, the device completed execution!", .{});
     }
 }
