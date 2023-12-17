@@ -2,7 +2,7 @@ const std = @import("std");
 const Al = std.mem.Allocator;
 const c = @cImport({
     @cDefine("CL_TARGET_OPENCL_VERSION", "300");
-    @cInclude("cl/opencl.h");
+    @cInclude("CL/opencl.h");
 });
 const info = std.log.info;
 
@@ -122,7 +122,7 @@ fn get_device_id(platform_id: c.cl_platform_id) !c.cl_device_id {
     }
     info("{} cl device(s) found on platform 0:", .{device_count});
 
-    for (device_ids[0..device_count]) |id, i| {
+    for (device_ids[0..device_count], 0..) |id, i| {
         var name: [1024]u8 = undefined;
         var name_len: usize = undefined;
         if (c.clGetDeviceInfo(id, c.CL_DEVICE_NAME, name.len, &name, &name_len) != c.CL_SUCCESS) {
@@ -176,7 +176,7 @@ fn run_test(device: c.cl_device_id) CLError!void {
         var init_value: [1024]i32 = undefined;
         var i: usize = 0;
         while (i < init_value.len) : (i += 1) {
-            init_value[i] = @intCast(i32, i);
+            init_value[i] = @as(i32, @intCast(i));
         }
         break :init init_value;
     };
@@ -209,10 +209,10 @@ fn run_test(device: c.cl_device_id) CLError!void {
     }
 
     // Execute kernel
-    if (c.clSetKernelArg(kernel, 0, @sizeOf(c.cl_mem), @ptrCast(*anyopaque, &input_buffer)) != c.CL_SUCCESS) {
+    if (c.clSetKernelArg(kernel, 0, @sizeOf(c.cl_mem), @as(*anyopaque, @ptrCast(&input_buffer))) != c.CL_SUCCESS) {
         return CLError.SetKernelArgFailed;
     }
-    if (c.clSetKernelArg(kernel, 1, @sizeOf(c.cl_mem), @ptrCast(*anyopaque, &output_buffer)) != c.CL_SUCCESS) {
+    if (c.clSetKernelArg(kernel, 1, @sizeOf(c.cl_mem), @as(*anyopaque, @ptrCast(&output_buffer))) != c.CL_SUCCESS) {
         return CLError.SetKernelArgFailed;
     }
 
@@ -231,7 +231,7 @@ fn run_test(device: c.cl_device_id) CLError!void {
 
     info("** results **", .{});
 
-    for (output_array) |val, i| {
+    for (output_array, 0..) |val, i| {
         if (i % 100 == 0) {
             info("{} ^ 2 = {}", .{ i, val });
         }

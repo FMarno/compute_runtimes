@@ -15,8 +15,6 @@ fn ze_rt(b: *std.build.Builder, target: std.zig.CrossTarget, optimize: std.built
         .optimize = optimize,
     });
 
-    //   exe.addLibraryPath("./deps/level-zero_1.10.0_win-sdk/lib");
-    //   exe.addIncludePath("./deps/level-zero_1.10.0_win-sdk/include");
     exe.linkSystemLibrary("ze_loader");
     exe.linkLibC();
     b.installArtifact(exe);
@@ -39,10 +37,12 @@ fn opencl_rt(b: *std.build.Builder, target: std.zig.CrossTarget, optimize: std.b
         .optimize = optimize,
     });
 
+    // one of there might be needed for windows
     //exe.addLibraryPath("C:/Program Files (x86)/IntelSWTools/system_studio_2020/OpenCL/sdk/lib/x64");
     //exe.addLibraryPath("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.2/lib/x64");
+
     exe.addIncludePath(.{ .path = "./deps/OpenCL-Headers" });
-    exe.linkSystemLibrary("opencl");
+    exe.linkSystemLibrary("OpenCL");
     exe.linkLibC();
     b.installArtifact(exe);
 
