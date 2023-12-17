@@ -138,35 +138,31 @@ pub fn main() !void {
         try check(c.zeCommandListCreateImmediate(context, device, &alt_desc, &command_list), ZeError.zeCommandListCreateImmediateFailed);
         defer _ = c.zeCommandListDestroy(command_list);
 
-        // // Create an event to be signaled by the device
-        // const ep_desc = c.ze_event_pool_desc_t{
-        //     .stype = c.ZE_STRUCTURE_TYPE_EVENT_POOL_DESC,
-        //     .count = 1,
-        //     .flags = c.ZE_EVENT_POOL_FLAG_HOST_VISIBLE,
-        //     .pNext = null,
-        // };
-        // var event_pool: c.ze_event_pool_handle_t = undefined;
+        // Create an event to be signaled by the device
+        const ep_desc = c.ze_event_pool_desc_t{
+            .stype = c.ZE_STRUCTURE_TYPE_EVENT_POOL_DESC,
+            .count = 1,
+            .flags = c.ZE_EVENT_POOL_FLAG_HOST_VISIBLE,
+            .pNext = null,
+        };
+        var event_pool: c.ze_event_pool_handle_t = undefined;
 
-        // try check(c.zeEventPoolCreate(context, &ep_desc, 1, &device, &event_pool), ZeError.zeEventPoolCreateFailed);
-        // defer _ = c.zeEventPoolDestroy(event_pool);
+        try check(c.zeEventPoolCreate(context, &ep_desc, 1, &device, &event_pool), ZeError.zeEventPoolCreateFailed);
+        defer _ = c.zeEventPoolDestroy(event_pool);
 
-        // var event: c.ze_event_handle_t = undefined;
-        // const ev_desc = c.ze_event_desc_t{
-        //     .stype = c.ZE_STRUCTURE_TYPE_EVENT_DESC,
-        //     .signal = c.ZE_EVENT_SCOPE_FLAG_HOST,
-        //     .wait = c.ZE_EVENT_SCOPE_FLAG_HOST,
-        //     .pNext = null,
-        //     .index = 0, // TODO not sure
-        // };
+        var event: c.ze_event_handle_t = undefined;
+        const ev_desc = c.ze_event_desc_t{
+            .stype = c.ZE_STRUCTURE_TYPE_EVENT_DESC,
+            .signal = c.ZE_EVENT_SCOPE_FLAG_HOST,
+            .wait = c.ZE_EVENT_SCOPE_FLAG_HOST,
+            .pNext = null,
+            .index = 0, // TODO not sure
+        };
 
-        // try check(c.zeEventCreate(event_pool, &ev_desc, &event), ZeError.zeEventCreateFailed);
-        // defer _ = c.zeEventDestroy(event);
+        try check(c.zeEventCreate(event_pool, &ev_desc, &event), ZeError.zeEventCreateFailed);
+        defer _ = c.zeEventDestroy(event);
 
-        // // signal the event from the device and wait for completion
-        // try check(c.zeCommandListAppendSignalEvent(command_list, event), ZeError.zeCommandListAppendSignalEventFailed);
-        // try check(c.zeEventHostSynchronize(event, std.math.maxInt(u64)), ZeError.zeEventHostSynchronizeFailed);
-        // info("Congratulations, the device completed execution!", .{});
-
+        // load the module
         const module_il = @embedFile("./kernels/square_array.spv");
 
         const module_desc = c.ze_module_desc_t{ .stype = c.ZE_STRUCTURE_TYPE_MODULE_DESC, .pNext = null, .format = c.ZE_MODULE_FORMAT_IL_SPIRV, .inputSize = module_il.len, .pInputModule = module_il, .pBuildFlags = null, .pConstants = null };
@@ -221,13 +217,18 @@ pub fn main() !void {
         try check(c.zeCommandListAppendLaunchKernel(command_list, kernel, &launch_args, null, 0, null), ZeError.zeCommandListAppendLaunchKernelFailed);
         try check(c.zeCommandListAppendMemoryCopy(command_list, &host_out, out_ptr, @sizeOf(@TypeOf(host_out)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
 
-        // TODO synchonize with event
-        try check(c.zeCommandListHostSynchronize(command_list, 0), ZeError.zeCommandListHostSynchronizeFailed);
+        // signal the event from the device and wait for completion
+        try check(c.zeCommandListAppendSignalEvent(command_list, event), ZeError.zeCommandListAppendSignalEventFailed);
+        try check(c.zeEventHostSynchronize(event, std.math.maxInt(u64)), ZeError.zeEventHostSynchronizeFailed);
 
         for (host_out, 0..) |out, idx| {
             if (out != host_in[idx] * host_in[idx]) {
                 info("wrong result at {}: {}", .{ idx, out });
             }
+        }
+
+        for ([_]usize{ 1, 2, 3, array_size - 1 }) |idx| {
+            info("{}^2 = {}", .{ host_in[idx], host_out[idx] });
         }
 
         info("Congratulations, the device completed execution!", .{});
