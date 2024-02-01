@@ -110,6 +110,9 @@ fn findDevice(driver_handle: c.ze_driver_handle_t, device_type: c.ze_device_type
 // https://github.com/oneapi-src/level-zero/blob/master/samples/zello_world/zello_world.cpp
 
 const array_size = 1024;
+const arg_type = i32;
+const kernel_name = "square_array";
+const kernel_file = "./kernels/square_array.spv";
 
 pub fn main() !void {
     try check(c.zeInit(0), ZeError.zeInitFailed);
@@ -163,7 +166,7 @@ pub fn main() !void {
         defer _ = c.zeEventDestroy(event);
 
         // load the module
-        const module_il = @embedFile("./kernels/square_array.spv");
+        const module_il = @embedFile(kernel_file);
 
         const module_desc = c.ze_module_desc_t{ .stype = c.ZE_STRUCTURE_TYPE_MODULE_DESC, .pNext = null, .format = c.ZE_MODULE_FORMAT_IL_SPIRV, .inputSize = module_il.len, .pInputModule = module_il, .pBuildFlags = null, .pConstants = null };
         var module: c.ze_module_handle_t = undefined;
@@ -174,7 +177,7 @@ pub fn main() !void {
             .stype = c.ZE_STRUCTURE_TYPE_KERNEL_DESC,
             .pNext = null,
             .flags = 0, // flags
-            .pKernelName = "square_array",
+            .pKernelName = kernel_name,
         };
         var kernel: c.ze_kernel_handle_t = undefined;
         try check(c.zeKernelCreate(module, &kernel_desc, &kernel), ZeError.zeKernelCreateFailed);
@@ -186,18 +189,18 @@ pub fn main() !void {
             .flags = 0, //c.ZE_MEMORY_ACCESS_CAP_FLAG_RW,
             .ordinal = 0,
         };
-        var in_ptr: ?*i32 = null;
-        var out_ptr: ?*i32 = null;
-        try check(c.zeMemAllocDevice(context, &mem_alloc_desc, array_size * @sizeOf(i32), @alignOf(i32), device, @as(*?*anyopaque, @ptrCast(&in_ptr))), ZeError.zeMemAllocDeviceFailed);
+        var in_ptr: ?*arg_type = null;
+        var out_ptr: ?*arg_type = null;
+        try check(c.zeMemAllocDevice(context, &mem_alloc_desc, array_size * @sizeOf(arg_type), @alignOf(arg_type), device, @as(*?*anyopaque, @ptrCast(&in_ptr))), ZeError.zeMemAllocDeviceFailed);
         defer _ = c.zeMemFree(context, in_ptr);
-        try check(c.zeMemAllocDevice(context, &mem_alloc_desc, array_size * @sizeOf(i32), @alignOf(i32), device, @as(*?*anyopaque, @ptrCast(&out_ptr))), ZeError.zeMemAllocDeviceFailed);
+        try check(c.zeMemAllocDevice(context, &mem_alloc_desc, array_size * @sizeOf(arg_type), @alignOf(arg_type), device, @as(*?*anyopaque, @ptrCast(&out_ptr))), ZeError.zeMemAllocDeviceFailed);
         defer _ = c.zeMemFree(context, out_ptr);
 
-        var host_in: [array_size]i32 = undefined;
-        var host_out = std.mem.zeroes([array_size]i32);
+        var host_in: [array_size]arg_type = undefined;
+        var host_out = std.mem.zeroes([array_size]arg_type);
 
         for (&host_in, 0..) |*in, idx| {
-            in.* = @as(i32, @intCast(idx));
+            in.* = @as(arg_type, @intCast(idx));
         }
 
         try check(c.zeCommandListAppendMemoryCopy(command_list, in_ptr, &host_in, @sizeOf(@TypeOf(host_in)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
@@ -210,10 +213,11 @@ pub fn main() !void {
         var z: u32 = 0;
         try check(c.zeKernelSuggestGroupSize(kernel, array_size, 1, 1, &x, &y, &z), ZeError.zeKernelSuggestGroupSizeFailed);
 
-        info("suggested group size: x:{} y:{} z:{}", .{ x, y, z });
+        info("suggested group size: x:{} y:{} z:{}", .{ x, y, y });
 
-        try check(c.zeKernelSetGroupSize(kernel, x, y, z), ZeError.zeKernelSetGroupSizeFailed);
-        const launch_args = c.ze_group_count_t{ .groupCountX = array_size, .groupCountY = 1, .groupCountZ = 1 };
+        try check(c.zeKernelSetGroupSize(kernel, x, 1, 1), ZeError.zeKernelSetGroupSizeFailed);
+        const launch_args = c.ze_group_count_t{ .groupCountX = array_size / x, .groupCountY = 1, .groupCountZ = 1 };
+        std.debug.assert(array_size % x == 0);
         try check(c.zeCommandListAppendLaunchKernel(command_list, kernel, &launch_args, null, 0, null), ZeError.zeCommandListAppendLaunchKernelFailed);
         try check(c.zeCommandListAppendMemoryCopy(command_list, &host_out, out_ptr, @sizeOf(@TypeOf(host_out)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
 

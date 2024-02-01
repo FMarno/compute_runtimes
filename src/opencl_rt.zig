@@ -150,10 +150,15 @@ fn run_test(device: c.cl_device_id) CLError!void {
     defer _ = c.clReleaseContext(ctx);
 
     var err: c.cl_int = undefined;
-    var program_src_c: [*c]const u8 = @embedFile("./kernels/square_array.cl");
-    var program = c.clCreateProgramWithSource(ctx, 1, &program_src_c, null, &err); // future: last arg is error code
-    //var program_src_c = @embedFile("./kernels/square_array.spv");
-    //var program = c.clCreateProgramWithIL(ctx, program_src_c, program_src_c.len, &err);
+    var program = read_prog_blk: {
+        if (use_spirv) {
+            var program_src_c: [*c]const u8 = @embedFile("./kernels/square_array.cl");
+            break :read_prog_blk c.clCreateProgramWithSource(ctx, 1, &program_src_c, null, &err);
+        } else {
+            const program_src_c = @embedFile("./kernels/square_array.spv");
+            break :read_prog_blk c.clCreateProgramWithIL(ctx, program_src_c, program_src_c.len, &err);
+        }
+    };
     if (err != c.CL_SUCCESS) {
         print_error(err);
         return CLError.CreateProgramFailed;
@@ -239,6 +244,8 @@ fn run_test(device: c.cl_device_id) CLError!void {
 
     info("** done, exiting **", .{});
 }
+
+const use_spirv = true;
 
 pub fn main() !void {
     //    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
