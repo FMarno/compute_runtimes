@@ -110,9 +110,9 @@ fn findDevice(driver_handle: c.ze_driver_handle_t, device_type: c.ze_device_type
 // https://github.com/oneapi-src/level-zero/blob/master/samples/zello_world/zello_world.cpp
 
 const array_size = 1024;
-const arg_type = i32;
-const kernel_name = "square_array";
-const kernel_file = "./kernels/square_array.spv";
+const arg_type = f32;
+const kernel_name = "CAT";
+const kernel_file = "./spirv_test.spv";
 
 pub fn main() !void {
     try check(c.zeInit(0), ZeError.zeInitFailed);
@@ -200,7 +200,7 @@ pub fn main() !void {
         var host_out = std.mem.zeroes([array_size]arg_type);
 
         for (&host_in, 0..) |*in, idx| {
-            in.* = @as(arg_type, @intCast(idx));
+            in.* = @floatFromInt(idx);
         }
 
         try check(c.zeCommandListAppendMemoryCopy(command_list, in_ptr, &host_in, @sizeOf(@TypeOf(host_in)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
@@ -216,7 +216,9 @@ pub fn main() !void {
         info("suggested group size: x:{} y:{} z:{}", .{ x, y, y });
 
         try check(c.zeKernelSetGroupSize(kernel, x, 1, 1), ZeError.zeKernelSetGroupSizeFailed);
+        info("set group size: x:{} y:{} z:{}", .{ x, 1, 1 });
         const launch_args = c.ze_group_count_t{ .groupCountX = array_size / x, .groupCountY = 1, .groupCountZ = 1 };
+        info("group count: x:{} y:{} z:{}", .{ launch_args.groupCountX, launch_args.groupCountY, launch_args.groupCountZ });
         std.debug.assert(array_size % x == 0);
         try check(c.zeCommandListAppendLaunchKernel(command_list, kernel, &launch_args, null, 0, null), ZeError.zeCommandListAppendLaunchKernelFailed);
         try check(c.zeCommandListAppendMemoryCopy(command_list, &host_out, out_ptr, @sizeOf(@TypeOf(host_out)), null, 0, null), ZeError.zeCommandListAppendMemoryCopyFailed);
