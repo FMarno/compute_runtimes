@@ -112,7 +112,7 @@ fn findDevice(driver_handle: c.ze_driver_handle_t, device_type: c.ze_device_type
 const array_size = 1024;
 const arg_type = f32;
 const kernel_name = "CAT";
-const kernel_file = "./spirv_test.spv";
+const kernel_file = "./kernels/spirv_test.spv";
 
 pub fn main() !void {
     try check(c.zeInit(0), ZeError.zeInitFailed);
