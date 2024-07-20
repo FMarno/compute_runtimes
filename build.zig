@@ -1,13 +1,13 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     opencl_rt(b, target, optimize);
     ze_rt(b, target, optimize);
 }
 
-fn ze_rt(b: *std.build.Builder, target: std.zig.CrossTarget, optimize: std.builtin.OptimizeMode) void {
+fn ze_rt(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
     const exe = b.addExecutable(.{
         .name = "ze_rt",
         .root_source_file = .{ .path = "src/ze_rt.zig" },
@@ -29,7 +29,7 @@ fn ze_rt(b: *std.build.Builder, target: std.zig.CrossTarget, optimize: std.built
     run_step.dependOn(&run_cmd.step);
 }
 
-fn opencl_rt(b: *std.build.Builder, target: std.zig.CrossTarget, optimize: std.builtin.OptimizeMode) void {
+fn opencl_rt(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
     const exe = b.addExecutable(.{
         .name = "opencl_rt",
         .root_source_file = .{ .path = "src/opencl_rt.zig" },

@@ -9,6 +9,11 @@ const info = std.log.info;
 const warn = std.log.warn;
 const zeroes = std.mem.zeroes;
 
+const array_size = 1024;
+const arg_type = f32;
+const kernel_name = "finlays_kernel";
+const kernel_file = "./kernels/spirv_test.spv";
+
 const ZeError = error{ zeInitFailed, zeCommandListAppendMemoryCopyFailed, zeKernelSuggestGroupSizeFailed, zeCommandListHostSynchronizeFailed, zeMemAllocDeviceFailed, zeKernelSetArgumentValueFailed, zeCommandListAppendLaunchKernelFailed, zeKernelSetGroupSizeFailed, zeKernelCreateFailed, zeModuleCreateFailed, zeEventHostSynchronizeFailed, zeCommandListAppendSignalEventFailed, zeContextDestoryFailed, zeEventCreateFailed, zeEventPoolCreateFailed, zeCommandListCreateImmediateFailed, zeDriverGetFailed, zeDeviceGetFailed, zeDeviceGetPropertiesFailed, zeDriverGetPropertiesFailed, zeContextCreateFailed };
 const ZelError = error{zelLoaderGetVersionFailed};
 
@@ -108,11 +113,6 @@ fn findDevice(driver_handle: c.ze_driver_handle_t, device_type: c.ze_device_type
 }
 
 // https://github.com/oneapi-src/level-zero/blob/master/samples/zello_world/zello_world.cpp
-
-const array_size = 1024;
-const arg_type = f32;
-const kernel_name = "CAT";
-const kernel_file = "./kernels/spirv_test.spv";
 
 pub fn main() !void {
     try check(c.zeInit(0), ZeError.zeInitFailed);
@@ -228,13 +228,13 @@ pub fn main() !void {
         try check(c.zeEventHostSynchronize(event, std.math.maxInt(u64)), ZeError.zeEventHostSynchronizeFailed);
 
         for (host_out, 0..) |out, idx| {
-            if (out != host_in[idx] * host_in[idx]) {
+            if (out != host_in[idx] * host_in[idx] + 1) {
                 info("wrong result at {}: {}", .{ idx, out });
             }
         }
 
         for ([_]usize{ 1, 2, 3, array_size - 1 }) |idx| {
-            info("{}^2 = {}", .{ host_in[idx], host_out[idx] });
+            info("{}^2 + 1 = {}", .{ host_in[idx], host_out[idx] });
         }
 
         info("Congratulations, the device completed execution!", .{});

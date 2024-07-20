@@ -143,16 +143,17 @@ fn get_device_id(platform_id: c.cl_platform_id) !c.cl_device_id {
 fn run_test(device: c.cl_device_id) CLError!void {
     info("** running test **", .{});
 
-    var ctx = c.clCreateContext(null, 1, &device, null, null, null); // future: last arg is error code
+    const ctx = c.clCreateContext(null, 1, &device, null, null, null); // future: last arg is error code
     if (ctx == null) {
         return CLError.CreateContextFailed;
     }
     defer _ = c.clReleaseContext(ctx);
 
     var err: c.cl_int = undefined;
-    var program = read_prog_blk: {
+    const program = read_prog_blk: {
         if (use_spirv) {
             var program_src_c: [*c]const u8 = @embedFile("./kernels/square_array.cl");
+
             break :read_prog_blk c.clCreateProgramWithSource(ctx, 1, &program_src_c, null, &err);
         } else {
             const program_src_c = @embedFile("./kernels/square_array.spv");
@@ -170,7 +171,7 @@ fn run_test(device: c.cl_device_id) CLError!void {
         return CLError.BuildProgramFailed;
     }
 
-    var kernel = c.clCreateKernel(program, "square_array", null);
+    const kernel = c.clCreateKernel(program, "square_array", null);
     if (kernel == null) {
         return CLError.CreateKernelFailed;
     }
@@ -198,7 +199,7 @@ fn run_test(device: c.cl_device_id) CLError!void {
     }
     defer _ = c.clReleaseMemObject(output_buffer);
 
-    var command_queue = c.clCreateCommandQueue(ctx, device, 0, null); // future: last arg is error code
+    const command_queue = c.clCreateCommandQueue(ctx, device, 0, null); // future: last arg is error code
     if (command_queue == null) {
         return CLError.CreateCommandQueueFailed;
     }
